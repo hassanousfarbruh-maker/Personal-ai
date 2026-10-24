@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111210">
+  <title>Stillroom — Infinite Canvas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111210;
+      color: #f0f0e9;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --panel: #191a17;
+      --panel-raised: #20211d;
+      --line: #30312b;
+      --muted: #85867d;
+      --soft: #b0b1a7;
+      --green: #b9e7a4;
+      --green-dark: #253322;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; overflow: hidden; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: 2px;
+    }
+    .app { display: grid; grid-template-rows: 58px 1fr; width: 100vw; height: 100dvh; }
+    .topbar {
+      z-index: 5;
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 19px;
+      border-bottom: 1px solid var(--line);
+      background: #171815;
+    }
+    .brand { display: flex; min-width: 170px; align-items: center; gap: 10px; }
+    .brand-mark { display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid #46513e; border-radius: 9px; color: var(--green); background: #23291f; }
+    .brand-mark svg { width: 16px; height: 16px; }
+    .brand-name { margin: 0; font-size: 13px; font-weight: 750; letter-spacing: .09em; }
+    .brand-caption { margin-top: 2px; color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+    .doc-title { min-width: 80px; width: min(230px, 25vw); padding: 7px 9px; border: 1px solid transparent; border-radius: 7px; color: var(--soft); background: transparent; font-size: 12px; text-align: center; }
+    .doc-title:hover, .doc-title:focus { border-color: var(--line); background: var(--panel); }
+    .top-actions { display: flex; min-width: 170px; justify-content: flex-end; gap: 7px; }
+    .button {
+      display: inline-flex;
+      min-height: 32px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: #c3c4bb;
+      background: var(--panel-raised);
+      cursor: pointer;
+      font-size: 11px;
+      transition: background .14s, border-color .14s, color .14s;
+    }
+    .button:hover { border-color: #55574c; color: #fff; background: #292a25; }
+    .button svg { width: 14px; height: 14px; }
+    .button.primary { border-color: #b9e7a4; color: #182016; background: var(--green); font-weight: 700; }
+    .button.primary:hover { background: #d0f1bf; }
+    .button.icon { width: 33px; padding: 0; }
+    .button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .workspace { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #10110f; }
+    .board {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background-color: #10110f;
+      background-image: radial-gradient(rgba(210,220,190,.16) .8px, transparent .8px);
+      background-position: var(--grid-x, 50%) var(--grid-y, 50%);
+      background-size: var(--grid-step, 64px) var(--grid-step, 64px);
+      touch-action: none;
+    }
+    .board::after {
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      border: 1px solid rgba(255,255,255,.025);
+      content: "";
+      pointer-events: none;
+    }
+    .art-layers { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .art-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #inputCanvas { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .board.tool-pan { cursor: grab; }
+    .board.is-panning { cursor: grabbing; }
+    .board.tool-eraser { cursor: cell; }
+    .board.tool-eyedropper { cursor: crosshair; }
+    .tool-rail {
+      position: absolute;
+      z-index: 4;
+      top: 16px;
+      left: 16px;
+      display: grid;
+      gap: 5px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(25,26,23,.94);
+      box-shadow: 0 8px 32px #0003;
+      backdrop-filter: blur(12px);
+    }
+    .tool-button {
+      position: relative;
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 0;
+      border-radius: 7px;
+      color: #a5a69d;
+      background: transparent;
+      cursor: pointer;
+    }
+    .tool-button:hover { color: #f2f3eb; background: #2a2b25; }
+    .tool-button[aria-pressed="true"] { color: var(--green); background: #2a3425; }
+    .tool-button svg { width: 17px; height: 17px; }
+    .tool-button .shortcut {
+      position: absolute;
+      right: 3px;
+      bottom: 1px;
+      color: #6f7067;
+      font-size: 8px;
+    }
+    .divider { height: 1px; margin: 2px 3px; background: var(--line); }
+
+    .left-panel {
+      position: absolute;
+      z-index: 3;
+      top: 16px;
+      left: 69px;
+      display: grid;
+      width: 205px;
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(25,26,23,.96);
+      box-shadow: 0 8px 32px #0003;
+      backdrop-filter: blur(12px);
+    }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; color: #e0e1d8; font-size: 11px; font-weight: 700; }
+    .section-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .color-row { display: flex; align-items: center; gap: 9px; }
+    .current-color-wrap { position: relative; width: 31px; height: 31px; overflow: hidden; border: 1px solid #55564d; border-radius: 8px; }
+    .current-color { width: 100%; height: 100%; padding: 0; border: 0; background: #b9e7a4; cursor: pointer; }
+    .current-color::-webkit-color-swatch-wrapper { padding: 0; }
+    .current-color::-webkit-color-swatch { border: 0; }
+    .hex-input { width: 94px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; color: #d4d5cc; background: #151613; font-family: ui-monospace, monospace; font-size: 10px; text-transform: uppercase; }
+    .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px; margin-top: 10px; }
+    .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid #ffffff35; border-radius: 50%; cursor: pointer; }
+    .swatch:hover { outline: 2px solid #eee; outline-offset: 2px; }
+    .control-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #c9cac1; font-size: 10px; }
+    .control-value { color: #96978d; font-family: ui-monospace, monospace; font-size: 10px; }
+    input[type="range"] { width: 100%; height: 4px; margin: 6px 0 2px; accent-color: var(--green); cursor: pointer; }
+    .brush-presets { display: flex; gap: 6px; margin-top: 9px; }
+    .preset { display: grid; width: 28px; height: 25px; place-items: center; border: 1px solid var(--line); border-radius: 5px; color: #aaa; background: #20211d; cursor: pointer; }
+    .preset:hover { border-color: #74766a; }
+    .preset-dot { display: block; border-radius: 50%; background: #c1c2b8; }
+    .help-text { color: #74756d; font-size: 9px; line-height: 1.5; }
+
+    .right-panel {
+      position: absolute;
+      z-index: 3;
+      top: 16px;
+      right: 16px;
+      display: grid;
+      width: 220px;
+      gap: 13px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(25,26,23,.96);
+      box-shadow: 0 8px 32px #0003;
+      backdrop-filter: blur(12px);
+    }
+    .layer-list { display: grid; max-height: min(36vh, 300px); gap: 5px; overflow: auto; }
+    .layer-row { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 5px; border: 1px solid transparent; border-radius: 7px; background: #20211d; }
+    .layer-row.selected { border-color: #58664c; background: #282e24; }
+    .layer-select { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; padding: 3px; border: 0; color: #d5d6cd; background: none; cursor: pointer; text-align: left; }
+    .layer-thumb { display: grid; width: 28px; height: 25px; flex: 0 0 auto; place-items: center; border: 1px solid #41423b; border-radius: 4px; color: #96978e; background: #171815; }
+    .layer-thumb svg { width: 15px; height: 15px; }
+    .layer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+    .layer-mini { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; color: #85867e; background: transparent; cursor: pointer; }
+    .layer-mini:hover { color: #eee; background: #373830; }
+    .layer-mini svg { width: 14px; height: 14px; vertical-align: middle; }
+    .layer-actions { display: flex; gap: 6px; }
+    .layer-actions .button { flex: 1; min-height: 29px; padding: 0 6px; font-size: 10px; }
+    .panel-separator { height: 1px; background: var(--line); }
+    .layer-opacity { display: flex; align-items: center; gap: 9px; }
+    .layer-opacity input { flex: 1; }
+
+    .zoom-controls {
+      position: absolute;
+      z-index: 3;
+      bottom: 17px;
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(25,26,23,.96);
+      box-shadow: 0 5px 24px #0003;
+      transform: translateX(-50%);
+    }
+    .zoom-controls .button { min-height: 29px; }
+    .zoom-readout { min-width: 48px; color: #c5c6bd; font-family: ui-monospace, monospace; font-size: 10px; text-align: center; }
+    .statusbar {
+      position: absolute;
+      z-index: 3;
+      right: 16px;
+      bottom: 20px;
+      display: flex;
+      max-width: 210px;
+      align-items: center;
+      gap: 6px;
+      color: #85867d;
+      font-size: 9px;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #a5c98c; }
+    .toast {
+      position: absolute;
+      z-index: 8;
+      top: 14px;
+      left: 50%;
+      max-width: calc(100% - 24px);
+      padding: 9px 13px;
+      border: 1px solid #4e5546;
+      border-radius: 8px;
+      color: #e7ebdf;
+      background: #252820;
+      box-shadow: 0 8px 26px #0005;
+      font-size: 11px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -8px);
+      transition: opacity .18s, transform .18s;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .file-input { display: none; }
+
+    @media (max-width: 760px) {
+      .app { grid-template-rows: 52px 1fr; }
+      .topbar { gap: 6px; padding: 0 9px; }
+      .brand { min-width: auto; gap: 7px; }
+      .brand-caption { display: none; }
+      .brand-name { font-size: 11px; }
+      .brand-mark { width: 26px; height: 26px; }
+      .doc-title { width: min(27vw, 160px); font-size: 10px; }
+      .top-actions { min-width: auto; gap: 4px; }
+      .top-actions .button { min-height: 30px; padding: 0 7px; font-size: 10px; }
+      .top-actions .button.icon { width: 30px; padding: 0; }
+      .top-actions .hide-small { display: none; }
+      .tool-rail { top: 9px; left: 8px; gap: 3px; padding: 4px; }
+      .tool-button { width: 32px; height: 33px; }
+      .left-panel { top: 9px; left: 51px; width: 176px; gap: 11px; padding: 10px; }
+      .right-panel { top: 9px; right: 8px; width: 174px; gap: 9px; padding: 9px; }
+      .layer-list { max-height: 27vh; }
+      .layer-actions .button { min-height: 27px; font-size: 9px; }
+      .zoom-controls { bottom: 11px; }
+      .statusbar { right: 8px; bottom: 17px; max-width: 80px; font-size: 8px; }
+    }
+    @media (max-width: 480px) {
+      .left-panel { top: auto; bottom: 57px; left: 8px; width: 165px; }
+      .right-panel { top: auto; right: 8px; bottom: 57px; width: 157px; }
+      .statusbar { display: none; }
+      .zoom-controls { bottom: 9px; }
+      .palette { gap: 6px; }
+      .swatch { width: 14px; height: 14px; }
+      .hex-input { width: 78px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand" aria-label="Stillroom Infinite Canvas">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 16.5 9.5 5l3.1 6.2 2.1-3.8L20 18"/><path d="M4 20h16"/></svg>
+        </div>
+        <div><h1 class="brand-name">STILLROOM</h1><div class="brand-caption">A LITTLE SPACE TO MAKE</div></div>
+      </div>
+      <input class="doc-title" id="documentTitle" aria-label="Drawing name" value="Untitled drawing" maxlength="60">
+      <nav class="top-actions" aria-label="Document actions">
+        <button class="button icon" id="undoButton" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button>
+        <button class="button icon" id="redoButton" title="Redo (Ctrl+Y)" aria-label="Redo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button>
+        <button class="button hide-small" id="newButton" title="Start a new drawing">New</button>
+        <button class="button hide-small" id="openButton" title="Open a Stillroom project">Open</button>
+        <button class="button hide-small" id="exportButton" title="Export the visible view as a PNG">Export PNG</button>
+        <button class="button primary" id="saveButton" title="Save a portable project file">Save project</button>
+      </nav>
+      <input class="file-input" id="fileInput" type="file" accept="application/json,.json">
+    </header>
+
+    <section class="workspace" aria-label="Drawing workspace">
+      <div class="board" id="board">
+        <div class="art-layers" id="artLayers"></div>
+        <canvas id="inputCanvas" aria-label="Infinite drawing canvas. Draw with the selected tool; hold Space to pan, use the mouse wheel to zoom." tabindex="0"></canvas>
+      </div>
+
+      <div class="tool-rail" role="toolbar" aria-label="Drawing tools">
+        <button class="tool-button" data-tool="brush" aria-label="Brush (B)" aria-pressed="true" title="Brush · B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6 4 4"/><path d="m3 21 3.8-.8L20 7a2.8 2.8 0 0 0-4-4L2.8 17.2 2 21Z"/><path d="m12 8-6 6"/></svg><span class="shortcut">B</span></button>
+        <button class="tool-button" data-tool="eraser" aria-label="Eraser (E)" aria-pressed="false" title="Eraser · E"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4a2 2 0 0 1 0-3l9-9 9 9-7 7H7Z"/><path d="m5 11 8 8"/><path d="M14 21h7"/></svg><span class="shortcut">E</span></button>
+        <button class="tool-button" data-tool="eyedropper" aria-label="Eyedropper (I)" aria-pressed="false" title="Eyedropper · I"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-5 12-12 4 4L7 21l-5 1Z"/><path d="m14 6 4 4"/><path d="m16 4 2-2 4 4-2 2"/></svg><span class="shortcut">I</span></button>
+        <span class="divider" aria-hidden="true"></span>
+        <button class="tool-button" data-tool="pan" aria-label="Pan canvas (H)" aria-pressed="false" title="Hand / pan · H"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5a2 2 0 0 1 4 0v6-8a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v9a7 7 0 0 1-7 7h-2a6 6 0 0 1-4.8-2.4L3 15a2 2 0 0 1 3-2.6L8 15"/></svg><span class="shortcut">H</span></button>
+      </div>
+
+      <aside class="left-panel" aria-label="Brush settings">
+        <div class="panel-heading">Brush &amp; color <span style="color:var(--muted);font-size:9px;font-weight:400">LOCAL</span></div>
+        <section>
+          <span class="section-label">Color</span>
+          <div class="color-row">
+            <div class="current-color-wrap"><input class="current-color" id="colorPicker" type="color" value="#b9e7a4" aria-label="Choose brush color"></div>
+            <label class="section-label" for="hexColor" style="margin:0">HEX</label>
+            <input class="hex-input" id="hexColor" value="#B9E7A4" maxlength="7" aria-label="Hex color value" spellcheck="false">
+          </div>
+          <div class="palette" id="palette" aria-label="Color palette"></div>
+        </section>
+        <section>
+          <div class="control-line"><label for="brushSize">Size</label><output class="control-value" id="sizeValue">12 px</output></div>
+          <input id="brushSize" type="range" min="1" max="80" value="12" aria-label="Brush size">
+          <div class="brush-presets" aria-label="Brush size presets">
+            <button class="preset" data-size="3" aria-label="Small brush"><span class="preset-dot" style="width:3px;height:3px"></span></button>
+            <button class="preset" data-size="8" aria-label="Medium brush"><span class="preset-dot" style="width:7px;height:7px"></span></button>
+            <button class="preset" data-size="20" aria-label="Large brush"><span class="preset-dot" style="width:12px;height:12px"></span></button>
+            <button class="preset" data-size="48" aria-label="Extra large brush"><span class="preset-dot" style="width:18px;height:18px"></span></button>
+          </div>
+        </section>
+        <section>
+          <div class="control-line"><label for="brushOpacity">Opacity</label><output class="control-value" id="opacityValue">100%</output></div>
+          <input id="brushOpacity" type="range" min="5" max="100" value="100" aria-label="Brush opacity">
+        </section>
+        <div class="help-text">A pressure-sensitive pen works too. Brush size is measured in the drawing, so zooming in reveals more detail.</div>
+      </aside>
+
+      <aside class="right-panel" aria-label="Layers">
+        <div class="panel-heading">Layers <button class="button icon" id="addLayer" aria-label="Add layer" title="Add layer" style="min-height:25px;width:25px">+</button></div>
+        <div class="layer-list" id="layerList" role="listbox" aria-label="Drawing layers"></div>
+        <div class="panel-separator"></div>
+        <div class="control-line" style="margin:0"><label for="layerOpacity">Layer opacity</label><output class="control-value" id="layerOpacityValue">100%</output></div>
+        <div class="layer-opacity"><input id="layerOpacity" type="range" min="0" max="100" value="100" aria-label="Selected layer opacity"></div>
+        <div class="layer-actions">
+          <button class="button" id="renameLayer" title="Rename selected layer">Rename</button>
+          <button class="button" id="deleteLayer" title="Delete selected layer">Delete layer</button>
+        </div>
+      </aside>
+
+      <div class="zoom-controls" aria-label="Canvas zoom controls">
+        <button class="button icon" id="zoomOut" title="Zoom out (−)" aria-label="Zoom out">−</button>
+        <span class="zoom-readout" id="zoomReadout" aria-live="polite">100%</span>
+        <button class="button icon" id="zoomIn" title="Zoom in (+)" aria-label="Zoom in">+</button>
+        <span style="width:1px;height:17px;margin:0 2px;background:var(--line)"></span>
+        <button class="button" id="homeView" title="Center the canvas view (0)">Center</button>
+      </div>
+      <div class="statusbar" role="status"><span class="status-dot"></span><span id="saveStatus">Saved on this device</span></div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "stillroom-infinite-canvas-v1";
+      const MIN_ZOOM = 0.000001;
+      const MAX_ZOOM = 1000000;
+      const COLORS = ["#f4f0e6","#191a17","#e67869","#e9aa75","#e7cf7a","#a9c78c","#70b7a0","#75a9c5","#8d91c7","#bd91bd","#d985a4","#a87562","#70746a","#c2c6bb","#f3a84d","#72c7d6"];
+      const board = document.getElementById("board");
+      const canvas = document.getElementById("inputCanvas");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const layerHost = document.getElementById("artLayers");
+      const layers = [];
+      const undoStack = [];
+      const redoStack = [];
+      const view = { x: 0, y: 0, zoom: 1 };
+      const pointer = { x: 0, y: 0 };
+      let activeLayerId = "";
+      let activeTool = "brush";
+      let brushColor = "#b9e7a4";
+      let brushSize = 12;
+      let brushOpacity = 1;
+      let drawing = null;
+      let panning = null;
+      const activePointers = new Map();
+      let touchGesture = null;
+      let spaceDown = false;
+      let viewportWidth = 1;
+      let viewportHeight = 1;
+      let dpr = 1;
+      let saveTimer = 0;
+      let toastTimer = 0;
+
+      const icon = {
+        eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+        hidden: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10 10 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3.1 3.8"/><path d="M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a9 9 0 0 0 3-.5"/></svg>',
+        up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 14 6-6 6 6"/></svg>',
+        down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 10 6 6 6-6"/></svg>',
+        layer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>'
+      };
+
+      function makeLayer(name) {
+        const element = document.createElement("canvas");
+        element.className = "art-layer";
+        element.setAttribute("aria-hidden", "true");
+        layerHost.append(element);
+        return { id: crypto.randomUUID(), name, visible: true, opacity: 1, strokes: [], canvas: element, context: element.getContext("2d") };
+      }
+
+      function activeLayer() {
+        return layers.find(layer => layer.id === activeLayerId) ?? layers[0];
+      }
+
+      function worldAt(screenX, screenY) {
+        return {
+          x: (screenX - viewportWidth / 2) / view.zoom + view.x,
+          y: (screenY - viewportHeight / 2) / view.zoom + view.y
+        };
+      }
+
+      function resize() {
+        const rect = board.getBoundingClientRect();
+        viewportWidth = Math.max(1, rect.width);
+        viewportHeight = Math.max(1, rect.height);
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        for (const layer of layers) {
+          layer.canvas.width = Math.round(viewportWidth * dpr);
+          layer.canvas.height = Math.round(viewportHeight * dpr);
+          layer.canvas.style.width = `${viewportWidth}px`;
+          layer.canvas.style.height = `${viewportHeight}px`;
+        }
+        canvas.width = Math.round(viewportWidth * dpr);
+        canvas.height = Math.round(viewportHeight * dpr);
+        canvas.style.width = `${viewportWidth}px`;
+        canvas.style.height = `${viewportHeight}px`;
+        renderAll();
+      }
+
+      function strokeVisible(stroke) {
+        if (!stroke.points.length) return false;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const point of stroke.points) {
+          minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
+        }
+        const margin = stroke.size / 2 + 2;
+        const left = view.x - viewportWidth / (2 * view.zoom);
+        const top = view.y - viewportHeight / (2 * view.zoom);
+        const right = view.x + viewportWidth / (2 * view.zoom);
+        const bottom = view.y + viewportHeight / (2 * view.zoom);
+        return maxX + margin >= left && minX - margin <= right && maxY + margin >= top && minY - margin <= bottom;
+      }
+
+      function renderStroke(context, stroke) {
+        const points = stroke.points;
+        if (!points.length) return;
+        context.save();
+        context.globalCompositeOperation = stroke.erase ? "destination-out" : "source-over";
+        context.globalAlpha = stroke.opacity;
+        context.strokeStyle = stroke.color;
+        context.fillStyle = stroke.color;
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        if (points.length === 1) {
+          const point = points[0];
+          context.beginPath();
+          context.arc(point.x, point.y, stroke.size * point.pressure / 2, 0, Math.PI * 2);
+          context.fill();
+          context.restore();
+          return;
+        }
+        for (let index = 1; index < points.length; index++) {
+          const a = points[index - 1];
+          const b = points[index];
+          context.beginPath();
+          context.lineWidth = stroke.size * ((a.pressure + b.pressure) / 2);
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.stroke();
+        }
+        context.restore();
+      }
+
+      function renderLayer(layer) {
+        const context = layer.context;
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+        layer.canvas.style.opacity = layer.opacity;
+        layer.canvas.style.display = layer.visible ? "block" : "none";
+        if (!layer.visible) return;
+        context.setTransform(
+          dpr * view.zoom, 0, 0, dpr * view.zoom,
+          dpr * (viewportWidth / 2 - view.x * view.zoom),
+          dpr * (viewportHeight / 2 - view.y * view.zoom)
+        );
+        for (const stroke of layer.strokes) {
+          if (strokeVisible(stroke)) renderStroke(context, stroke);
+        }
+      }
+
+      function renderAll() {
+        clearPreview();
+        for (const layer of layers) renderLayer(layer);
+        updateGrid();
+        updateZoomReadout();
+      }
+
+      function updateGrid() {
+        const worldStep = Math.pow(2, Math.round(Math.log2(64 / view.zoom)));
+        const screenStep = worldStep * view.zoom;
+        const offsetX = (viewportWidth / 2 - view.x * view.zoom) % screenStep;
+        const offsetY = (viewportHeight / 2 - view.y * view.zoom) % screenStep;
+        board.style.setProperty("--grid-step", `${screenStep}px`);
+        board.style.setProperty("--grid-x", `${offsetX}px`);
+        board.style.setProperty("--grid-y", `${offsetY}px`);
+      }
+
+      function clearPreview() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function renderCurrentStroke() {
+        const layer = activeLayer();
+        if (!layer || !drawing) return;
+        if (drawing.erase) {
+          renderLayer(layer);
+          renderStroke(layer.context, drawing);
+          clearPreview();
+          return;
+        }
+        clearPreview();
+        const drawContext = ctx;
+        drawContext.setTransform(
+          dpr * view.zoom, 0, 0, dpr * view.zoom,
+          dpr * (viewportWidth / 2 - view.x * view.zoom),
+          dpr * (viewportHeight / 2 - view.y * view.zoom)
+        );
+        renderStroke(drawContext, drawing);
+      }
+
+      function setZoom(nextZoom, screenX = viewportWidth / 2, screenY = viewportHeight / 2) {
+        const anchor = worldAt(screenX, screenY);
+        view.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+        view.x = anchor.x - (screenX - viewportWidth / 2) / view.zoom;
+        view.y = anchor.y - (screenY - viewportHeight / 2) / view.zoom;
+        renderAll();
+        persistSoon();
+      }
+
+      function updateZoomReadout() {
+        const percent = view.zoom * 100;
+        let value;
+        if (percent >= 10000) value = `${(percent / 1000).toPrecision(3)}k%`;
+        else if (percent < 0.01) value = `${percent.toExponential(1)}%`;
+        else value = `${Number(percent.toPrecision(3))}%`;
+        document.getElementById("zoomReadout").textContent = value;
+      }
+
+      function updateHistoryButtons() {
+        document.getElementById("undoButton").disabled = undoStack.length === 0;
+        document.getElementById("redoButton").disabled = redoStack.length === 0;
+      }
+
+      function persistSoon() {
+        document.getElementById("saveStatus").textContent = "Unsaved changes";
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(projectData()));
+            document.getElementById("saveStatus").textContent = "Saved on this device";
+          } catch (error) {
+            document.getElementById("saveStatus").textContent = "Could not autosave";
+            showToast(`Autosave failed: ${error.message}`);
+          }
+        }, 500);
+      }
+
+      function projectData() {
+        return {
+          format: "stillroom-infinite-canvas",
+          version: 1,
+          title: document.getElementById("documentTitle").value.trim() || "Untitled drawing",
+          view: { x: view.x, y: view.y, zoom: view.zoom },
+          activeLayerId,
+          layers: layers.map(({ id, name, visible, opacity, strokes }) => ({ id, name, visible, opacity, strokes }))
+        };
+      }
+
+      function applyProject(data) {
+        if (!data || data.format !== "stillroom-infinite-canvas" || data.version !== 1 || !Array.isArray(data.layers)) {
+          throw new Error("That file is not a supported Stillroom project.");
+        }
+        if (data.layers.length < 1 || data.layers.length > 100) throw new Error("A project must contain between 1 and 100 layers.");
+        const parsed = data.layers.map((item, layerIndex) => {
+          if (!item || typeof item.name !== "string" || !Array.isArray(item.strokes)) throw new Error(`Layer ${layerIndex + 1} is invalid.`);
+          const strokes = item.strokes.map(stroke => {
+            if (!stroke || typeof stroke.color !== "string" || !Number.isFinite(stroke.size) || !Array.isArray(stroke.points)) {
+              throw new Error("The project contains an invalid stroke.");
+            }
+            const points = stroke.points.map(point => {
+              if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.pressure)) {
+                throw new Error("The project contains an invalid drawing point.");
+              }
+              return { x: point.x, y: point.y, pressure: Math.max(.05, Math.min(1, point.pressure)) };
+            });
+            return { color: stroke.color, size: Math.max(.01, Math.min(1000000, stroke.size)), opacity: Math.max(0, Math.min(1, Number(stroke.opacity) || 0)), erase: stroke.erase === true, points };
+          });
+          return {
+            id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+            name: item.name.slice(0, 50) || `Layer ${layerIndex + 1}`,
+            visible: item.visible !== false,
+            opacity: Number.isFinite(item.opacity) ? Math.max(0, Math.min(1, item.opacity)) : 1,
+            strokes
+          };
+        });
+
+        for (const layer of layers) layer.canvas.remove();
+        layers.length = 0;
+        for (const item of parsed) {
+          const layer = makeLayer(item.name);
+          Object.assign(layer, { id: item.id, visible: item.visible, opacity: item.opacity, strokes: item.strokes });
+          layers.push(layer);
+        }
+        const nextView = data.view ?? {};
+        view.x = Number.isFinite(nextView.x) ? nextView.x : 0;
+        view.y = Number.isFinite(nextView.y) ? nextView.y : 0;
+        view.zoom = Number.isFinite(nextView.zoom) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextView.zoom)) : 1;
+        activeLayerId = layers.some(layer => layer.id === data.activeLayerId) ? data.activeLayerId : layers[layers.length - 1].id;
+        document.getElementById("documentTitle").value = String(data.title || "Untitled drawing").slice(0, 60);
+        undoStack.length = 0;
+        redoStack.length = 0;
+        renderAll();
+        renderLayerList();
+        updateHistoryButtons();
+        persistSoon();
+      }
+
+      function showToast(message) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+      }
+
+      function setTool(tool) {
+        activeTool = tool;
+        for (const button of document.querySelectorAll("[data-tool]")) {
+          button.setAttribute("aria-pressed", String(button.dataset.tool === tool));
+        }
+        board.classList.toggle("tool-pan", tool === "pan");
+        board.classList.toggle("tool-eraser", tool === "eraser");
+        board.classList.toggle("tool-eyedropper", tool === "eyedropper");
+      }
+
+      function renderPalette() {
+        const palette = document.getElementById("palette");
+        for (const color of COLORS) {
+          const button = document.createElement("button");
+          button.className = "swatch";
+          button.type = "button";
+          button.style.backgroundColor = color;
+          button.setAttribute("aria-label", `Choose color ${color}`);
+          button.title = color;
+          button.addEventListener("click", () => setColor(color));
+          palette.append(button);
+        }
+      }
+
+      function setColor(color) {
+        if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+        brushColor = color.toLowerCase();
+        document.getElementById("colorPicker").value = brushColor;
+        document.getElementById("hexColor").value = brushColor.toUpperCase();
+      }
+
+      function renderLayerList() {
+        const list = document.getElementById("layerList");
+        list.replaceChildren();
+        for (let index = layers.length - 1; index >= 0; index--) {
+          const layer = layers[index];
+          const row = document.createElement("div");
+          row.className = `layer-row${layer.id === activeLayerId ? " selected" : ""}`;
+          row.setAttribute("role", "option");
+          row.setAttribute("aria-selected", String(layer.id === activeLayerId));
+
+          const select = document.createElement("button");
+          select.className = "layer-select";
+          select.type = "button";
+          select.setAttribute("aria-label", `Select layer ${layer.name}`);
+          select.addEventListener("click", () => selectLayer(layer.id));
+          const thumb = document.createElement("span");
+          thumb.className = "layer-thumb";
+          thumb.innerHTML = icon.layer;
+          const name = document.createElement("span");
+          name.className = "layer-name";
+          name.textContent = layer.name;
+          select.append(thumb, name);
+
+          const visibility = document.createElement("button");
+          visibility.className = "layer-mini";
+          visibility.type = "button";
+          visibility.innerHTML = layer.visible ? icon.eye : icon.hidden;
+          visibility.setAttribute("aria-label", `${layer.visible ? "Hide" : "Show"} ${layer.name}`);
+          visibility.addEventListener("click", () => {
+            layer.visible = !layer.visible;
+            renderLayer(layer);
+            renderLayerList();
+            persistSoon();
+          });
+
+          const move = document.createElement("button");
+          move.className = "layer-mini";
+          move.type = "button";
+          move.innerHTML = index === layers.length - 1 ? icon.down : icon.up;
+          move.setAttribute("aria-label", index === layers.length - 1 ? "Move layer down" : "Move layer up");
+          move.disabled = layers.length < 2;
+          move.addEventListener("click", () => moveLayer(layer.id, index === layers.length - 1 ? -1 : 1));
+          row.append(select, visibility, move);
+          list.append(row);
+        }
+        document.getElementById("deleteLayer").disabled = layers.length <= 1;
+        const selected = activeLayer();
+        document.getElementById("layerOpacity").value = Math.round((selected?.opacity ?? 1) * 100);
+        document.getElementById("layerOpacityValue").textContent = `${Math.round((selected?.opacity ?? 1) * 100)}%`;
+      }
+
+      function selectLayer(id) {
+        activeLayerId = id;
+        renderLayerList();
+        persistSoon();
+      }
+
+      function moveLayer(id, direction) {
+        const index = layers.findIndex(layer => layer.id === id);
+        const nextIndex = index + direction;
+        if (index < 0 || nextIndex < 0 || nextIndex >= layers.length) return;
+        [layers[index], layers[nextIndex]] = [layers[nextIndex], layers[index]];
+        for (const layer of layers) layerHost.append(layer.canvas);
+        renderLayerList();
+        persistSoon();
+      }
+
+      function setCanvasPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = (event.clientX - rect.left) * viewportWidth / rect.width;
+        pointer.y = (event.clientY - rect.top) * viewportHeight / rect.height;
+      }
+
+      function sampleColor(point) {
+        const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(pointer.x * dpr)));
+        const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(pointer.y * dpr)));
+        let pixel;
+        for (let index = layers.length - 1; index >= 0; index--) {
+          const layer = layers[index];
+          if (!layer.visible || layer.opacity === 0) continue;
+          const candidate = layer.context.getImageData(x, y, 1, 1).data;
+          if (candidate[3] > 0) {
+            pixel = candidate;
+            break;
+          }
+        }
+        if (!pixel || pixel[3] === 0) {
+          showToast("Nothing to pick here");
+          return;
+        }
+        setColor(`#${[pixel[0], pixel[1], pixel[2]].map(value => value.toString(16).padStart(2, "0")).join("")}`);
+        setTool("brush");
+      }
+
+      function startPan(event) {
+        panning = { x: pointer.x, y: pointer.y, viewX: view.x, viewY: view.y, pointerId: event.pointerId };
+        board.classList.add("is-panning");
+        canvas.setPointerCapture(event.pointerId);
+      }
+
+      function pointerDown(event) {
+        if (event.button !== 0 && event.button !== 1) return;
+        setCanvasPoint(event);
+        if (event.pointerType === "touch") {
+          activePointers.set(event.pointerId, { x: pointer.x, y: pointer.y });
+          if (activePointers.size === 2) {
+            drawing = null;
+            panning = null;
+            clearPreview();
+            const [first, second] = [...activePointers.values()];
+            const centerX = (first.x + second.x) / 2;
+            const centerY = (first.y + second.y) / 2;
+            touchGesture = {
+              distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)),
+              centerX, centerY, zoom: view.zoom,
+              worldX: worldAt(centerX, centerY).x,
+              worldY: worldAt(centerX, centerY).y
+            };
+            canvas.setPointerCapture(event.pointerId);
+            event.preventDefault();
+            return;
+          }
+        }
+        const wantsPan = event.button === 1 || spaceDown || activeTool === "pan";
+        if (wantsPan) {
+          startPan(event);
+          event.preventDefault();
+          return;
+        }
+        canvas.setPointerCapture(event.pointerId);
+        if (activeTool === "eyedropper") {
+          sampleColor(worldAt(pointer.x, pointer.y));
+          return;
+        }
+        const point = worldAt(pointer.x, pointer.y);
+        drawing = {
+          color: brushColor,
+          size: brushSize / view.zoom,
+          opacity: brushOpacity,
+          erase: activeTool === "eraser",
+          points: [{ x: point.x, y: point.y, pressure: event.pressure > 0 ? event.pressure : .5 }]
+        };
+        renderCurrentStroke();
+        event.preventDefault();
+      }
+
+      function pointerMove(event) {
+        setCanvasPoint(event);
+        if (event.pointerType === "touch" && activePointers.has(event.pointerId)) {
+          activePointers.set(event.pointerId, { x: pointer.x, y: pointer.y });
+          if (touchGesture && activePointers.size >= 2) {
+            const [first, second] = [...activePointers.values()];
+            const centerX = (first.x + second.x) / 2;
+            const centerY = (first.y + second.y) / 2;
+            const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+            view.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, touchGesture.zoom * distance / touchGesture.distance));
+            view.x = touchGesture.worldX - (centerX - viewportWidth / 2) / view.zoom;
+            view.y = touchGesture.worldY - (centerY - viewportHeight / 2) / view.zoom;
+            renderAll();
+            persistSoon();
+            return;
+          }
+        }
+        if (panning && panning.pointerId === event.pointerId) {
+          view.x = panning.viewX - (pointer.x - panning.x) / view.zoom;
+          view.y = panning.viewY - (pointer.y - panning.y) / view.zoom;
+          renderAll();
+          return;
+        }
+        if (!drawing || !canvas.hasPointerCapture(event.pointerId)) return;
+        const point = worldAt(pointer.x, pointer.y);
+        const previous = drawing.points[drawing.points.length - 1];
+        if (Math.hypot(point.x - previous.x, point.y - previous.y) < .1 / view.zoom) return;
+        drawing.points.push({ x: point.x, y: point.y, pressure: event.pressure > 0 ? event.pressure : .5 });
+        renderCurrentStroke();
+      }
+
+      function finishPointer(event) {
+        if (event.pointerType === "touch") activePointers.delete(event.pointerId);
+        if (touchGesture) {
+          touchGesture = null;
+          drawing = null;
+          clearPreview();
+          persistSoon();
+          return;
+        }
+        if (panning && panning.pointerId === event.pointerId) {
+          panning = null;
+          board.classList.remove("is-panning");
+          persistSoon();
+          return;
+        }
+        if (!drawing) return;
+        const stroke = drawing;
+        drawing = null;
+        const layer = activeLayer();
+        layer.strokes.push(stroke);
+        undoStack.push({ type: "stroke", layerId: layer.id, stroke });
+        if (undoStack.length > 200) undoStack.shift();
+        redoStack.length = 0;
+        clearPreview();
+        renderLayer(layer);
+        updateHistoryButtons();
+        persistSoon();
+      }
+
+      function undo() {
+        const action = undoStack.pop();
+        if (!action) return;
+        const layer = layers.find(item => item.id === action.layerId);
+        if (layer) {
+          const index = layer.strokes.lastIndexOf(action.stroke);
+          if (index !== -1) layer.strokes.splice(index, 1);
+          renderLayer(layer);
+          redoStack.push(action);
+        }
+        updateHistoryButtons();
+        persistSoon();
+      }
+
+      function redo() {
+        const action = redoStack.pop();
+        if (!action) return;
+        const layer = layers.find(item => item.id === action.layerId);
+        if (layer) {
+          layer.strokes.push(action.stroke);
+          renderLayer(layer);
+          undoStack.push(action);
+        }
+        updateHistoryButtons();
+        persistSoon();
+      }
+
+      function download(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function safeFilename(extension) {
+        const title = document.getElementById("documentTitle").value.trim() || "drawing";
+        return `${title.replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-|-$/g, "").slice(0, 50) || "drawing"}.${extension}`;
+      }
+
+      function saveProject() {
+        const data = new Blob([JSON.stringify(projectData(), null, 2)], { type: "application/json" });
+        download(data, safeFilename("stillroom.json"));
+        showToast("Project saved — your editable strokes are in the file");
+      }
+
+      function exportPng() {
+        const output = document.createElement("canvas");
+        output.width = Math.max(1, Math.round(viewportWidth * dpr));
+        output.height = Math.max(1, Math.round(viewportHeight * dpr));
+        const outputContext = output.getContext("2d");
+        outputContext.fillStyle = "#ffffff";
+        outputContext.fillRect(0, 0, output.width, output.height);
+        for (const layer of layers) {
+          if (!layer.visible) continue;
+          outputContext.globalAlpha = layer.opacity;
+          outputContext.drawImage(layer.canvas, 0, 0);
+        }
+        outputContext.globalAlpha = 1;
+        output.toBlob(blob => {
+          if (!blob) {
+            showToast("PNG export failed. Try again or save the project file.");
+            return;
+          }
+          download(blob, safeFilename("png"));
+          showToast("Visible canvas exported as PNG");
+        }, "image/png");
+      }
+
+      function newDrawing() {
+        if (layers.some(layer => layer.strokes.length) && !confirm("Start a new drawing? Save your project first if you want to keep this one.")) return;
+        for (const layer of layers) layer.canvas.remove();
+        layers.length = 0;
+        undoStack.length = 0;
+        redoStack.length = 0;
+        const layer = makeLayer("Layer 1");
+        layers.push(layer);
+        activeLayerId = layer.id;
+        view.x = 0;
+        view.y = 0;
+        view.zoom = 1;
+        document.getElementById("documentTitle").value = "Untitled drawing";
+        renderAll();
+        renderLayerList();
+        updateHistoryButtons();
+        persistSoon();
+      }
+
+      function zoomStep(direction) {
+        setZoom(view.zoom * (direction > 0 ? 1.25 : 1 / 1.25), pointer.x || viewportWidth / 2, pointer.y || viewportHeight / 2);
+      }
+
+      function loadSavedProject() {
+        let saved;
+        try {
+          saved = localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+          console.error("Could not read saved drawing:", error);
+          showToast("Local storage is unavailable; use Save project to keep your work");
+          return false;
+        }
+        if (!saved) return false;
+        try {
+          applyProject(JSON.parse(saved));
+          document.getElementById("saveStatus").textContent = "Restored from this device";
+          return true;
+        } catch (error) {
+          console.error("Could not restore saved drawing:", error);
+          showToast("The saved drawing could not be restored");
+          return false;
+        }
+      }
+
+      renderPalette();
+      layers.push(makeLayer("Layer 1"));
+      activeLayerId = layers[0].id;
+      renderLayerList();
+      resize();
+      loadSavedProject();
+
+      window.addEventListener("resize", resize);
+      if ("ResizeObserver" in window) new ResizeObserver(resize).observe(board);
+      canvas.addEventListener("pointerdown", pointerDown);
+      canvas.addEventListener("pointermove", pointerMove);
+      canvas.addEventListener("pointerup", finishPointer);
+      canvas.addEventListener("pointercancel", finishPointer);
+      canvas.addEventListener("lostpointercapture", event => {
+        if (drawing && !canvas.hasPointerCapture(event.pointerId)) finishPointer(event);
+        if (panning && panning.pointerId === event.pointerId) {
+          panning = null;
+          board.classList.remove("is-panning");
+        }
+      });
+      canvas.addEventListener("wheel", event => {
+        event.preventDefault();
+        setCanvasPoint(event);
+        const factor = Math.exp(-event.deltaY * (event.ctrlKey ? .006 : .0018));
+        setZoom(view.zoom * factor, pointer.x, pointer.y);
+      }, { passive: false });
+      canvas.addEventListener("contextmenu", event => event.preventDefault());
+
+      for (const button of document.querySelectorAll("[data-tool]")) {
+        button.addEventListener("click", () => setTool(button.dataset.tool));
+      }
+      document.getElementById("colorPicker").addEventListener("input", event => setColor(event.target.value));
+      document.getElementById("hexColor").addEventListener("change", event => {
+        const value = event.target.value.trim();
+        if (/^#[0-9a-f]{6}$/i.test(value)) setColor(value);
+        else {
+          event.target.value = brushColor.toUpperCase();
+          showToast("Enter a 6-digit hex color, like #B9E7A4");
+        }
+      });
+      document.getElementById("brushSize").addEventListener("input", event => {
+        brushSize = Number(event.target.value);
+        document.getElementById("sizeValue").textContent = `${brushSize} px`;
+      });
+      document.querySelectorAll("[data-size]").forEach(button => button.addEventListener("click", () => {
+        brushSize = Number(button.dataset.size);
+        document.getElementById("brushSize").value = brushSize;
+        document.getElementById("sizeValue").textContent = `${brushSize} px`;
+      }));
+      document.getElementById("brushOpacity").addEventListener("input", event => {
+        brushOpacity = Number(event.target.value) / 100;
+        document.getElementById("opacityValue").textContent = `${event.target.value}%`;
+      });
+      document.getElementById("undoButton").addEventListener("click", undo);
+      document.getElementById("redoButton").addEventListener("click", redo);
+      document.getElementById("zoomIn").addEventListener("click", () => zoomStep(1));
+      document.getElementById("zoomOut").addEventListener("click", () => zoomStep(-1));
+      document.getElementById("homeView").addEventListener("click", () => {
+        view.x = 0; view.y = 0; view.zoom = 1; renderAll(); persistSoon();
+      });
+      document.getElementById("newButton").addEventListener("click", newDrawing);
+      document.getElementById("addLayer").addEventListener("click", () => {
+        const layer = makeLayer(`Layer ${layers.length + 1}`);
+        layers.push(layer);
+        activeLayerId = layer.id;
+        renderLayerList();
+        persistSoon();
+      });
+      document.getElementById("layerOpacity").addEventListener("input", event => {
+        const layer = activeLayer();
+        layer.opacity = Number(event.target.value) / 100;
+        document.getElementById("layerOpacityValue").textContent = `${event.target.value}%`;
+        renderLayer(layer);
+        persistSoon();
+      });
+      document.getElementById("renameLayer").addEventListener("click", () => {
+        const layer = activeLayer();
+        const name = prompt("Layer name", layer.name);
+        if (name === null) return;
+        layer.name = name.trim().slice(0, 50) || layer.name;
+        renderLayerList();
+        persistSoon();
+      });
+      document.getElementById("deleteLayer").addEventListener("click", () => {
+        if (layers.length <= 1) return;
+        const layer = activeLayer();
+        if (!confirm(`Delete "${layer.name}" and its strokes?`)) return;
+        const index = layers.indexOf(layer);
+        layer.canvas.remove();
+        layers.splice(index, 1);
+        activeLayerId = layers[Math.max(0, index - 1)].id;
+        undoStack.splice(0, undoStack.length, ...undoStack.filter(action => action.layerId !== layer.id));
+        redoStack.splice(0, redoStack.length, ...redoStack.filter(action => action.layerId !== layer.id));
+        renderLayerList();
+        updateHistoryButtons();
+        persistSoon();
+      });
+      document.getElementById("documentTitle").addEventListener("input", persistSoon);
+      document.getElementById("saveButton").addEventListener("click", saveProject);
+      document.getElementById("exportButton").addEventListener("click", exportPng);
+      document.getElementById("openButton").addEventListener("click", () => document.getElementById("fileInput").click());
+      document.getElementById("fileInput").addEventListener("change", async event => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          if (layers.some(layer => layer.strokes.length) && !confirm("Open this project and replace the current drawing? Save your project first if you want to keep it.")) return;
+          applyProject(JSON.parse(await file.text()));
+          showToast("Project opened");
+        } catch (error) {
+          showToast(`Could not open project: ${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      window.addEventListener("keydown", event => {
+        const target = event.target;
+        const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+        if (event.code === "Space" && !editing) {
+          spaceDown = true;
+          if (document.activeElement === canvas) event.preventDefault();
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !editing) {
+          event.preventDefault();
+          event.shiftKey ? redo() : undo();
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y" && !editing) {
+          event.preventDefault();
+          redo();
+          return;
+        }
+        if (editing || event.ctrlKey || event.metaKey || event.altKey) return;
+        const key = event.key.toLowerCase();
+        if (key === "b") setTool("brush");
+        else if (key === "e") setTool("eraser");
+        else if (key === "h") setTool("pan");
+        else if (key === "i") setTool("eyedropper");
+        else if (key === "+" || key === "=") zoomStep(1);
+        else if (key === "-") zoomStep(-1);
+        else if (key === "0") {
+          view.x = 0; view.y = 0; view.zoom = 1; renderAll(); persistSoon();
+        } else if (key === "[") {
+          brushSize = Math.max(1, brushSize - 1);
+          document.getElementById("brushSize").value = brushSize;
+          document.getElementById("sizeValue").textContent = `${brushSize} px`;
+        } else if (key === "]") {
+          brushSize = Math.min(80, brushSize + 1);
+          document.getElementById("brushSize").value = brushSize;
+          document.getElementById("sizeValue").textContent = `${brushSize} px`;
+        }
+      });
+      window.addEventListener("keyup", event => {
+        if (event.code === "Space") spaceDown = false;
+      });
+      window.addEventListener("blur", () => { spaceDown = false; });
+    })();
+  </script>
+</body>
+</html>
